@@ -41,6 +41,7 @@ exports.getPost = (req, res, next) => {
 }
 
 exports.createPost = (req, res, next) => {
+    console.log('createPost')
     const errors = validationResult(req)
     if(!errors.isEmpty()) {
         const error = new Error('Your input values are invalid');
@@ -54,7 +55,10 @@ exports.createPost = (req, res, next) => {
     }
     const title = req.body.title
     const content = req.body.content
-    const imageUrl = req.file.path
+    let imageUrl = req.file.path
+    imageUrl = imageUrl.replace(/\\/g, '/');
+
+    console.log('imageUrl', imageUrl)
 
     const post = new Post({
         title: title,
