@@ -22,7 +22,7 @@ exports.signUp = (req, res, next) => {
             const user = new User({
                 email: email,
                 password: hashedPw,
-                name: name
+                name: name,
             })
             return user.save()
         })

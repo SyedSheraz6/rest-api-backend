@@ -4,6 +4,7 @@ const path = require('path')
 const { validationResult } = require('express-validator')
 
 const Post = require('../models/post')
+const User = require('../models/user')
 
 exports.getPosts = (req, res, next) => {
     const currentPage = req.query.page || 1
@@ -70,21 +71,31 @@ exports.createPost = (req, res, next) => {
     let imageUrl = req.file.path
     imageUrl = imageUrl.replace(/\\/g, '/');
 
+    let creator;
+
     const post = new Post({
         title: title,
         content: content,
         imageUrl: imageUrl,
-        creator: {
-            name: 'Sheraz'
-        }
+        creator: req.userId
     })
 
-    post.save().then(post => {
-        res.status(201).json({
-            message: 'Post created successfully!',
-            post: post
+    post.save()
+        .then( post => {
+            return User.findById(req.userId)     
         })
-    })
+        .then(user => {
+            creator = user
+            user.posts.push(post)
+            return user.save()
+        })
+        .then(result => {
+            res.status(201).json({
+                message: 'Post created successfully!',
+                post: post,
+                creator: { _id: creator._id, name: creator.name }
+            })
+        })
         .catch(err => {
             if (!err.statusCode) {
                 err.statusCode = 500
@@ -129,6 +140,12 @@ exports.updatePost = (req, res, next) => {
                 throw error
             }
 
+            if(post.creator.toString() !== req.userId) {
+                const error = new Error('Not Authorized!')
+                error.statusCode = 403
+                throw error
+            }
+
             if (imageUrl !== post.imageUrl) {
                 clearImage(post.imageUrl)
             }
@@ -162,6 +179,11 @@ exports.deletePost = (req, res, next) => {
             if (!post) {
                 const error = new Error('Post not found!')
                 error.statusCode = 404
+                throw error
+            }
+            if(post.creator.toString() !== req.userId) {
+                const error = new Error('Not Authorized!')
+                error.statusCode = 403
                 throw error
             }
             clearImage(post.imageUrl)
