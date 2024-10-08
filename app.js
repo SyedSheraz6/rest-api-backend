@@ -4,6 +4,8 @@ const bodyParser = require('body-parser')
 const mongoose = require('mongoose')
 const multer = require('multer')
 
+const io = require('./socket')
+
 const feedRoutes = require('./routes/feed')
 const authRoutes = require('./routes/auth')
 
@@ -56,8 +58,15 @@ app.use((error, req, res, next) => {
 
 mongoose.connect(MONGO_DB_URI)
 .then((res) => {
-    console.log('connected')
-    app.listen(8080)
+    console.log('DB connected')
+    const server = app.listen(8080)
+
+    const socket = io.init(server)
+
+    socket.on('connection', socket => {
+        console.log('User connected')
+    });
+    
 })
 .catch(console)
 

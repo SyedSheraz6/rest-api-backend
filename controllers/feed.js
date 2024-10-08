@@ -1,10 +1,12 @@
 const fs = require('fs')
 const path = require('path')
-
 const { validationResult } = require('express-validator')
+
+const io = require('../socket')
 
 const Post = require('../models/post')
 const User = require('../models/user')
+const user = require('../models/user')
 
 exports.getPosts = (req, res, next) => {
     const currentPage = req.query.page || 1
@@ -14,6 +16,8 @@ exports.getPosts = (req, res, next) => {
         .then(count => {
             totalItems = count;
             return Post.find()
+                .populate('creator')
+                .sort({createdAt: -1})
                 .skip((currentPage - 1) * perPage)
                 .limit(perPage)
         })
@@ -89,7 +93,8 @@ exports.createPost = (req, res, next) => {
             user.posts.push(post)
             return user.save()
         })
-        .then(result => {
+        .then(user => {
+            io.getIo().emit('posts', {action: 'create', post:{...post._doc, creator: {_id: req.userId, name: user.name}}})
             res.status(201).json({
                 message: 'Post created successfully!',
                 post: post,
@@ -132,7 +137,7 @@ exports.updatePost = (req, res, next) => {
     }
     imageUrl = imageUrl.replace(/\\/g, '/');
 
-    Post.findById(postId)
+    Post.findById(postId).populate('creator')
         .then(post => {
             if (!post) {
                 const error = new Error('Post not found!')
@@ -140,7 +145,7 @@ exports.updatePost = (req, res, next) => {
                 throw error
             }
 
-            if(post.creator.toString() !== req.userId) {
+            if(post.creator._id.toString() !== req.userId) {
                 const error = new Error('Not Authorized!')
                 error.statusCode = 403
                 throw error
@@ -156,10 +161,11 @@ exports.updatePost = (req, res, next) => {
 
             return post.save()
         })
-        .then(result => {
+        .then(post => {
+            io.getIo().emit('posts', {action: 'update', post:post})
             res.status(200).json({
                 message: 'Post updated!',
-                post: result
+                post: post
             })
         })
         .catch(err => {
@@ -197,6 +203,7 @@ exports.deletePost = (req, res, next) => {
             return user.save()
         })
         .then(result => {
+            io.getIo().emit('posts', {action: 'delete', post:postId})
             res.status(200).json({
                 message: 'Post deleted'
             })
